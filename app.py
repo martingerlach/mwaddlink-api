@@ -23,6 +23,7 @@ from utils import get_feature_set
 
 
 from flask import Flask, request, jsonify, render_template
+import xgboost as xgb
 
 '''
 This API makes link recommendations for articles.
@@ -52,39 +53,40 @@ def parse(title):
     text = revision["slots"]["main"]["content"]
     return mwparserfromhell.parse(text)
 
-# anchors = pickle.load( open( "./data/{0}/{0}.anchors.pkl".format(lang), "rb" ) )
-# pageids = pickle.load( open( "./data/{0}/{0}.pageids.pkl".format(lang), "rb" ) )
-# redirects = pickle.load( open( "./data/{0}/{0}.redirects.pkl".format(lang), "rb" ) )
-# from wikipedia2vec import Wikipedia2Vec
-# w2file = './data/{0}/{0}.w2v.bin'.format(lang)
-# word2vec = Wikipedia2Vec.load(w2file)
-# import fasttext
-# navfile = './data/{0}/{0}.nav.bin'.format(lang)
-# nav2vec = fasttext.load_model(navfile)
+# ## open datasets as shelve
+# anchors = shelve.open( "./data/{0}/{0}.anchors.db".format(lang), flag='r' )
+# word2vec = shelve.open("./data/{0}/{0}.w2v.filtered".format(lang), flag='r' )
+# nav2vec = shelve.open("./data/{0}/{0}.nav.filtered".format(lang), flag='r' )
+# ## the trained model
+# import xgboost as xgb
+# model = xgb.XGBClassifier()  # init model
+# model.load_model('./data/{0}/0001.link.bin'.format(lang))  # load data
 
 ## open datasets as shelve
-anchors = shelve.open( "./data/{0}/{0}.anchors".format(lang), flag='r' )
-# pageids = shelve.open( "./data/{0}/{0}.pageids".format(lang), flag='r' )
-# redirects = shelve.open( "./data/{0}/{0}.redirects".format(lang), flag='r' )
-word2vec = shelve.open("./data/{0}/{0}.w2v.filtered".format(lang), flag='r' )
-nav2vec = shelve.open("./data/{0}/{0}.nav.filtered".format(lang), flag='r' )
+# Load the anchor dictionary (the main data structure)
+anchors = shelve.open( "./data/{0}/{0}.anchors.db".format(lang), flag='r' )
+## load word2vec features
+word2vec = shelve.open("./data/{0}/{0}.w2v.filtered.db".format(lang), flag='r' )
+## load navigation-vector features
+nav2vec = shelve.open("./data/{0}/{0}.nav.filtered.db".format(lang), flag='r' )
 
-
-## the trained model
-import xgboost as xgb
+## load trained model
 model = xgb.XGBClassifier()  # init model
-model.load_model('./data/{0}/0001.link.bin'.format(lang))  # load data
+model.load_model('./data/{0}/{0}.linkmodel.bin'.format(lang))  # load data
+
+
+
 
 app = Flask(__name__)
 app.config["DEBUG"] = True
 app.config['JSON_SORT_KEYS'] = False
 CUSTOM_UA = 'reader session app -- mgerlach@wikimedia.org'
 
-THRESHOLD = 0.95
+# THRESHOLD = 0.95
 
 
 ## load embedding
-print("Try: http://127.0.0.1:5000/api/v1/addlink?title=Fernand_Léger")
+print("Try: http://127.0.0.1:5000/api/v1/addlink?title=Shri_Yantra")
 
 @app.route('/')
 def index():
@@ -94,8 +96,9 @@ def index():
 def get_recommendations():
 
     title = request.args.get('title')
+    threshold = float(request.args.get('threshold' , 0.8))
     # try:
-    result = process_page(title)
+    result = process_page(title, threshold=threshold)
 
     result_formatted = [ {'title': title, 'wikitext_new':str(result)}]
 
@@ -105,7 +108,7 @@ def get_recommendations():
 
 
 
-def classify_links(page, text, THRESHOLD):
+def classify_links(page, text, threshold = 0.95):
     #start_time = time.time()
     cand_prediction = {}
     # Work with the 10 most frequent candidates
@@ -122,7 +125,7 @@ def classify_links(page, text, THRESHOLD):
     top_candidate = max(cand_prediction.items(), key=operator.itemgetter(1))
     
     # Check if the max probability meets the threshold before returning
-    if top_candidate[1] < THRESHOLD:
+    if top_candidate[1] < threshold:
         return None
     #print("--- %s seconds ---" % (time.time() - start_time))
     return top_candidate
@@ -161,7 +164,7 @@ def tokenize_sentence_split(text):
             yield " ".join(tok_acc)
 
 # Actual Linking function
-def process_page(page):
+def process_page(page, threshold = 0.95):
     page_wikicode = parse(page)
     page_wikicode_init= str(page_wikicode) # save the initial state
     linked_mentions, linked_links = getLinks(page_wikicode, page)
@@ -190,7 +193,7 @@ def process_page(page):
                                 mention not in tested_mentions):
                                 #logic
                                 #print("testing:", mention, len(anchors[mention]))
-                                candidate = classify_links(page, mention, THRESHOLD)
+                                candidate = classify_links(page, mention, threshold=threshold)
                                 if candidate:
                                     candidate_link, candidate_proba = candidate
                                     #print(">> ", mention, candidate)
