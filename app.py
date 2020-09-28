@@ -71,11 +71,11 @@ def parse(title):
 # nav2vec = pickle.load(open("./data/{0}_pkl/{0}.nav.filtered.pkl".format(lang),'rb'))
 
 
-anchors = SqliteDict("./data/{0}_sqlite/{0}.anchors.sqlite".format(lang))
+anchors = SqliteDict("./data/{0}/{0}.anchors.sqlite".format(lang))
 # pageids = SqliteDict("./data/{0}_sqlite/{0}.pageids.sqlite".format(lang)) 
 # redirects = SqliteDict("./data/{0}_sqlite/{0}.redirects.sqlite".format(lang)) 
-word2vec = SqliteDict("./data/{0}_sqlite/{0}.w2v.filtered.sqlite".format(lang))
-nav2vec = SqliteDict("./data/{0}_sqlite/{0}.nav.filtered.sqlite".format(lang))
+word2vec = SqliteDict("./data/{0}/{0}.w2v.filtered.sqlite".format(lang))
+nav2vec = SqliteDict("./data/{0}/{0}.nav.filtered.sqlite".format(lang))
 
 ## load trained model
 model = xgb.XGBClassifier()  # init model
