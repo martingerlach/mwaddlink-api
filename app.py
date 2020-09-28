@@ -1,6 +1,7 @@
 import re
-import pickle
-import shelve
+# import pickle
+# import shelve
+from sqlitedict import SqliteDict
 
 import mwparserfromhell
 from mwparserfromhell.nodes.text import Text
@@ -29,7 +30,6 @@ import xgboost as xgb
 This API makes link recommendations for articles.
 Pass the article title.
 Output is a wikitext with suggestions.
-we thus make a query to https://reader.wmcloud.org/api/v1/reader?qid=Q81068910
 '''
 lang = 'simple'
 wiki   = lang+'wiki'
@@ -64,11 +64,18 @@ def parse(title):
 
 ## open datasets as shelve
 # Load the anchor dictionary (the main data structure)
-anchors = shelve.open( "./data/{0}/{0}.anchors.db".format(lang), flag='r' )
-## load word2vec features
-word2vec = shelve.open("./data/{0}/{0}.w2v.filtered.db".format(lang), flag='r' )
-## load navigation-vector features
-nav2vec = shelve.open("./data/{0}/{0}.nav.filtered.db".format(lang), flag='r' )
+# anchors = pickle.load( open("./data/{0}_pkl/{0}.anchors.pkl".format(lang),'rb'))
+# ## load word2vec features
+# word2vec = pickle.load( open("./data/{0}_pkl/{0}.w2v.filtered.pkl".format(lang),'rb'))
+# ## load navigation-vector features
+# nav2vec = pickle.load(open("./data/{0}_pkl/{0}.nav.filtered.pkl".format(lang),'rb'))
+
+
+anchors = SqliteDict("./data/{0}_sqlite/{0}.anchors.sqlite".format(lang))
+# pageids = SqliteDict("./data/{0}_sqlite/{0}.pageids.sqlite".format(lang)) 
+# redirects = SqliteDict("./data/{0}_sqlite/{0}.redirects.sqlite".format(lang)) 
+word2vec = SqliteDict("./data/{0}_sqlite/{0}.w2v.filtered.sqlite".format(lang))
+nav2vec = SqliteDict("./data/{0}_sqlite/{0}.nav.filtered.sqlite".format(lang))
 
 ## load trained model
 model = xgb.XGBClassifier()  # init model
